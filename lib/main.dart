@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(CalculatorApp());
+  runApp(const CalculatorApp());
 }
 
 class CalculatorApp extends StatefulWidget {
@@ -12,34 +12,95 @@ class CalculatorApp extends StatefulWidget {
 }
 
 class _CalculatorAppState extends State<CalculatorApp> {
-  final TextEditingController num1 = TextEditingController();
-  final TextEditingController num2 = TextEditingController();
-  double result = 0;
+  String display = '';        // Показывает результат
+  String expression = '';     // Показывает всё выражение
+  double num1 = 0;
+  double num2 = 0;
+  String operation = '';
+  bool justCalculated = false;
 
-  void calculate(String operation) {
-    double n1 = double.tryParse(num1.text) ?? 0;
-    double n2 = double.tryParse(num2.text) ?? 0;
-
+  void pressButton(String value) {
     setState(() {
-      if (operation == '+') result = n1 + n2;
-      if (operation == '-') result = n1 - n2;
-      if (operation == '×') result = n1 * n2;
-      if (operation == '÷') {
-        if (n2 != 0) {
-          result = n1 / n2;
-        } else {
-          result = double.nan;
+      // Очистка
+      if (value == 'AC') {
+        display = '';
+        expression = '';
+        num1 = 0;
+        num2 = 0;
+        operation = '';
+        return;
+      }
+
+      // Если нажали число или точку
+      if (RegExp(r'^[0-9.]$').hasMatch(value)) {
+        if (justCalculated) {
+          // Если до этого был результат, начинаем заново
+          display = '';
+          expression = '';
+          justCalculated = false;
         }
+        display += value;
+        expression += value;
+        return;
+      }
+
+      // Если нажали операцию
+      if (['+', '-', '×', '÷'].contains(value)) {
+        if (display.isEmpty && expression.isEmpty) return;
+
+        // Если только что посчитали — продолжаем с результатом
+        if (justCalculated) {
+          expression = display;
+          justCalculated = false;
+        }
+
+        num1 = double.tryParse(display) ?? 0;
+        operation = value;
+        display = '';
+        expression += ' $value ';
+        return;
+      }
+
+      // Вычисление
+      if (value == '=') {
+        num2 = double.tryParse(display) ?? 0;
+        double result = 0;
+
+        if (operation == '+') result = num1 + num2;
+        if (operation == '-') result = num1 - num2;
+        if (operation == '×') result = num1 * num2;
+        if (operation == '÷') {
+          result = (num2 == 0) ? double.nan : num1 / num2;
+        }
+
+        display = result.isNaN ? 'Ошибка' : result.toString();
+        expression += ' = $display';
+        justCalculated = true;
+        operation = '';
       }
     });
   }
 
-  void clearAll() {
-    num1.clear();
-    num2.clear();
-    setState(() {
-      result = 0;
-    });
+  Widget buildButton(String text, {Color? color, double fontSize = 26}) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: ElevatedButton(
+          onPressed: () => pressButton(text),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color ?? Colors.grey[850],
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(fontSize: fontSize, color: Colors.white),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -48,115 +109,85 @@ class _CalculatorAppState extends State<CalculatorApp> {
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          title: Text('Калькулятор'),
-          backgroundColor: Colors.grey[900],
-          centerTitle: true,
-        ),
-        body: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+        body: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // Экран выражения
+              Container(
+                width: double.infinity,
+                alignment: Alignment.bottomRight,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                child: Text(
+                  expression,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 22,
+                  ),
+                ),
+              ),
+
+              // Экран результата
+              Container(
+                alignment: Alignment.bottomRight,
+                padding: const EdgeInsets.only(right: 24, bottom: 20),
+                child: Text(
+                  display.isEmpty ? '0' : display,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 48,
+                    fontWeight: FontWeight.w300,
+                  ),
+                ),
+              ),
+
+              const Divider(color: Colors.white24),
+
+              // Кнопки
+              Column(
                 children: [
-                  // Экран результата
-                  Container(
-                    alignment: Alignment.centerRight,
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[850],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[700]!),
-                    ),
-                    child: Text(
-                      'Результат: $result',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  // Поля ввода
-                  TextField(
-                    controller: num1,
-                    keyboardType: TextInputType.number,
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                    decoration: InputDecoration(
-                      labelText: 'Первое число',
-                      labelStyle: TextStyle(color: Colors.grey[400]),
-                      filled: true,
-                      fillColor: Colors.grey[850],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  TextField(
-                    controller: num2,
-                    keyboardType: TextInputType.number,
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                    decoration: InputDecoration(
-                      labelText: 'Второе число',
-                      labelStyle: TextStyle(color: Colors.grey[400]),
-                      filled: true,
-                      fillColor: Colors.grey[850],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  // Кнопки операций
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _calcButton('+', Colors.orangeAccent),
-                      _calcButton('-', Colors.orangeAccent),
-                      _calcButton('×', Colors.orangeAccent),
-                      _calcButton('÷', Colors.orangeAccent),
+                      buildButton('AC', color: Colors.grey[700]),
+                      buildButton('÷', color: Colors.orange),
                     ],
                   ),
-                  SizedBox(height: 25),
-                  // Кнопка очистки
-                  ElevatedButton(
-                    onPressed: clearAll,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      padding: EdgeInsets.symmetric(vertical: 14, horizontal: 40),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      'Очистить',
-                      style: TextStyle(fontSize: 18, color: Colors.white),
-                    ),
+                  Row(
+                    children: [
+                      buildButton('7'),
+                      buildButton('8'),
+                      buildButton('9'),
+                      buildButton('×', color: Colors.orange),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      buildButton('4'),
+                      buildButton('5'),
+                      buildButton('6'),
+                      buildButton('-', color: Colors.orange),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      buildButton('1'),
+                      buildButton('2'),
+                      buildButton('3'),
+                      buildButton('+', color: Colors.orange),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      buildButton('0'),
+                      buildButton('.', fontSize: 30),
+                      buildButton('=', color: Colors.orange),
+                    ],
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _calcButton(String symbol, Color color) {
-    return ElevatedButton(
-      onPressed: () => calculate(symbol),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        shape: CircleBorder(),
-        padding: EdgeInsets.all(20),
-        elevation: 6,
-      ),
-      child: Text(
-        symbol,
-        style: TextStyle(fontSize: 26, color: Colors.white),
       ),
     );
   }
